@@ -10,6 +10,9 @@
 *.suo
 *.userosscache
 *.sln.docstates
+agent.md
+wiki.md
+DESIGN_DOC.md
 
 # Rider
 .idea/
