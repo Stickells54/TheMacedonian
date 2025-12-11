@@ -2,6 +2,35 @@
 
 All notable changes to The Macedonian mod will be documented in this file.
 
+## [0.3.0] - 2025-12-11 - Right Hand Release
+
+### Added
+
+#### Right Hand (Royal Protector) System
+- **Petition Dialog** - Talk to your ruler to request becoming Royal Protector
+- **Battle Tracking** - Track field battles fought alongside the ruler
+- **Requirements System** - Clan Tier 3+, Relation 30+, 3 battles won together
+- **Companion Hostage** - Send a companion to serve at the ruler's court
+- **Notifications** - Progress updates when fighting alongside ruler
+
+#### Battle Event Tracking
+- **MapEventEnded Handler** - Tracks field battles with ruler participation
+- **Victory Detection** - Only counts wins on the same side as the ruler
+- **Progress Notifications** - Alerts when battle requirements are met
+
+### Changed
+- Updated Harmony patches for Bannerlord v1.3.9 compatibility
+- Fixed `ChangeRelationAction` parameter names (`hero1/hero2` → `hero/gainedRelationWith`)
+- Removed incompatible `MapEventSide.OnFinish` patch
+- Added `TaleWorlds.CampaignSystem.MapEvents` and `Party` namespace imports
+
+### Fixed
+- Harmony error on launch related to `MapEventSide_OnFinish_Postfix`
+- Harmony error related to `ChangeRelationAction` parameter mismatch
+- Build compatibility with Bannerlord v1.3.9 DLLs
+
+---
+
 ## [0.2.0] - 2025-12-11 - Full Implementation Release
 
 ### Added

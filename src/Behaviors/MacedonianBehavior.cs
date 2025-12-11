@@ -4,8 +4,11 @@ using System.Linq;
 using TaleWorlds.CampaignSystem;
 using TaleWorlds.CampaignSystem.Actions;
 using TaleWorlds.CampaignSystem.GameMenus;
+using TaleWorlds.CampaignSystem.MapEvents;
+using TaleWorlds.CampaignSystem.Party;
 using TaleWorlds.CampaignSystem.Settlements;
 using TaleWorlds.Core;
+using TaleWorlds.InputSystem;
 using TaleWorlds.Library;
 using TaleWorlds.Localization;
 using TaleWorlds.SaveSystem;
@@ -146,7 +149,12 @@ namespace TheMacedonian.Behaviors
             CampaignEvents.WeeklyTickEvent.AddNonSerializedListener(this, OnWeeklyTick);
             CampaignEvents.HeroKilledEvent.AddNonSerializedListener(this, OnHeroKilled);
             CampaignEvents.RulingClanChanged.AddNonSerializedListener(this, OnRulingClanChanged);
+            CampaignEvents.MapEventEnded.AddNonSerializedListener(this, OnMapEventEnded);
+            CampaignEvents.TickEvent.AddNonSerializedListener(this, OnTick);
         }
+
+        // Hotkey cooldown to prevent spam
+        private float _lastHotkeyTime = 0f;
 
         public override void SyncData(IDataStore dataStore)
         {
@@ -257,6 +265,283 @@ namespace TheMacedonian.Behaviors
             {
                 OnBecameRuler(_becameRulerThroughCoup);
             }
+        }
+
+        private void OnMapEventEnded(MapEvent mapEvent)
+        {
+            // Only track field battles for Right Hand purposes
+            if (mapEvent.EventType != MapEvent.BattleTypes.FieldBattle) return;
+
+            var kingdom = Clan.PlayerClan?.Kingdom;
+            if (kingdom?.Leader == null) return;
+
+            // Already Right Hand? No need to track
+            if (_isRightHand) return;
+
+            // Check if both player and ruler participated on the same side
+            bool playerParticipated = false;
+            bool rulerParticipated = false;
+            bool sameSide = false;
+
+            foreach (var party in mapEvent.InvolvedParties)
+            {
+                var leader = party.LeaderHero;
+                if (leader == Hero.MainHero)
+                {
+                    playerParticipated = true;
+                }
+                if (leader == kingdom.Leader)
+                {
+                    rulerParticipated = true;
+                }
+            }
+
+            // Check if they were on the same side
+            if (playerParticipated && rulerParticipated)
+            {
+                var playerSide = mapEvent.GetMapEventSide(mapEvent.PlayerSide);
+                foreach (var party in playerSide.Parties)
+                {
+                    if (party.Party?.LeaderHero == kingdom.Leader)
+                    {
+                        sameSide = true;
+                        break;
+                    }
+                }
+            }
+
+            if (playerParticipated && rulerParticipated && sameSide && mapEvent.WinningSide == mapEvent.PlayerSide)
+            {
+                OnBattleWithRuler();
+
+                if (MCMSettings.Instance?.EnableDebugLogging ?? false)
+                {
+                    InformationManager.DisplayMessage(new InformationMessage(
+                        $"[DEBUG] Battle with ruler! Total: {_battlesFoughtWithRuler}/{RequiredBattlesWithRuler}",
+                        Colors.Gray));
+                }
+            }
+        }
+
+        private void OnTick(float dt)
+        {
+            // Check for Ctrl+I hotkey press for Intrigue stats
+            // Cooldown of 0.5 seconds to prevent spam
+            _lastHotkeyTime += dt;
+            
+            if (_lastHotkeyTime >= 0.5f && IsIntrigueHotkeyPressed())
+            {
+                // Only show if not in a menu/conversation
+                if (Campaign.Current != null && 
+                    !Campaign.Current.ConversationManager.IsConversationInProgress)
+                {
+                    _lastHotkeyTime = 0f;
+                    ShowIntrigueStatsPanel();
+                }
+            }
+        }
+
+        private bool IsIntrigueHotkeyPressed()
+        {
+            // Ctrl+I to open intrigue stats
+            bool ctrlHeld = Input.IsKeyDown(TaleWorlds.InputSystem.InputKey.LeftControl) || 
+                            Input.IsKeyDown(TaleWorlds.InputSystem.InputKey.RightControl);
+            bool iPressed = Input.IsKeyPressed(TaleWorlds.InputSystem.InputKey.I);
+            return ctrlHeld && iPressed;
+        }
+
+        /// <summary>
+        /// Shows a comprehensive popup with all intrigue-related stats.
+        /// Accessible via configurable hotkey on the campaign map.
+        /// </summary>
+        private void ShowIntrigueStatsPanel()
+        {
+            var kingdom = Clan.PlayerClan?.Kingdom;
+            var ruler = kingdom?.Leader;
+
+            // Build the stats text
+            var sb = new System.Text.StringBuilder();
+
+            // === HEADER ===
+            sb.AppendLine("═══════════════════════════════════════");
+            sb.AppendLine("         THE MACEDONIAN - INTRIGUE STATUS");
+            sb.AppendLine("═══════════════════════════════════════");
+            sb.AppendLine();
+
+            // === KINGDOM STATUS ===
+            if (kingdom != null)
+            {
+                sb.AppendLine($"Kingdom: {kingdom.Name}");
+                sb.AppendLine($"Ruler: {(ruler != null ? ruler.Name.ToString() : "None")}");
+                if (ruler != null && !_isRuler)
+                {
+                    int rulerRelation = Hero.MainHero.GetRelation(ruler);
+                    sb.AppendLine($"Your Relation with Ruler: {rulerRelation}");
+                }
+                sb.AppendLine();
+            }
+            else
+            {
+                sb.AppendLine("You are not part of a kingdom.");
+                sb.AppendLine();
+            }
+
+            // === RIGHT HAND STATUS ===
+            sb.AppendLine("─── RIGHT HAND STATUS ───");
+            if (_isRuler)
+            {
+                sb.AppendLine("You ARE the ruler!");
+            }
+            else if (_isRightHand)
+            {
+                sb.AppendLine("Status: ROYAL PROTECTOR ✓");
+                float daysSinceAppointed = (float)CampaignTime.Now.ToDays - _rightHandAppointedDay;
+                sb.AppendLine($"Days in Position: {(int)daysSinceAppointed}");
+                if (_hostageCompanion != null)
+                {
+                    sb.AppendLine($"Hostage at Court: {_hostageCompanion.Name}");
+                }
+            }
+            else
+            {
+                sb.AppendLine("Status: Not Yet Right Hand");
+                sb.AppendLine($"Battles with Ruler: {_battlesFoughtWithRuler} / {RequiredBattlesWithRuler}");
+                if (ruler != null)
+                {
+                    int relation = Hero.MainHero.GetRelation(ruler);
+                    string relationStatus = relation >= 30 ? "✓" : $"(need 30+)";
+                    sb.AppendLine($"Relation with Ruler: {relation} {relationStatus}");
+                }
+                string tierStatus = Clan.PlayerClan.Tier >= 3 ? "✓" : $"(need 3+)";
+                sb.AppendLine($"Clan Tier: {Clan.PlayerClan.Tier} {tierStatus}");
+                int companionCount = Clan.PlayerClan?.Companions?.Count ?? 0;
+                string companionStatus = companionCount > 0 ? "✓" : "(need 1+)";
+                sb.AppendLine($"Companions: {companionCount} {companionStatus}");
+            }
+            sb.AppendLine();
+
+            // === CONSPIRACY STATUS ===
+            sb.AppendLine("─── CONSPIRACY STATUS ───");
+            float coupStrength = CoupStrength;
+            float leakRisk = LeakRisk;
+            int conspirators = 0;
+
+            if (kingdom != null)
+            {
+                foreach (var clan in kingdom.Clans)
+                {
+                    if (GetClanData(clan).Status == ConspiracyStatus.Conspirator)
+                    {
+                        conspirators++;
+                    }
+                }
+            }
+
+            sb.AppendLine($"Conspirator Clans: {conspirators}");
+            sb.AppendLine($"Coup Strength: {coupStrength:F1}%");
+            
+            string coupReadiness = coupStrength >= 60 ? "READY" : 
+                                   coupStrength >= 40 ? "Risky" : 
+                                   coupStrength >= 20 ? "Building" : "Weak";
+            sb.AppendLine($"Coup Readiness: {coupReadiness}");
+            sb.AppendLine($"Leak Risk: {leakRisk:F1}%");
+            sb.AppendLine();
+
+            // === SUSPICION LEVELS ===
+            sb.AppendLine("─── SUSPICION LEVELS ───");
+            string GetSuspicionLevel(float value) => 
+                value >= 75 ? "CRITICAL" :
+                value >= 50 ? "High" :
+                value >= 25 ? "Moderate" : "Low";
+
+            sb.AppendLine($"Ruler Suspicion: {_suspicion.RulerSuspicion:F0}/100 ({GetSuspicionLevel(_suspicion.RulerSuspicion)})");
+            sb.AppendLine($"Court Suspicion: {_suspicion.CourtSuspicion:F0}/100 ({GetSuspicionLevel(_suspicion.CourtSuspicion)})");
+            sb.AppendLine($"Kingdom Suspicion: {_suspicion.KingdomSuspicion:F0}/100 ({GetSuspicionLevel(_suspicion.KingdomSuspicion)})");
+            sb.AppendLine();
+
+            // === LEGITIMACY (if ruler) ===
+            if (_isRuler)
+            {
+                sb.AppendLine("─── LEGITIMACY STATUS ───");
+                string legStatus = _legitimacy >= 75 ? "Secure" :
+                                   _legitimacy >= 50 ? "Stable" :
+                                   _legitimacy >= 25 ? "Fragile" : "CRITICAL";
+                sb.AppendLine($"Legitimacy: {_legitimacy:F0}/100 ({legStatus})");
+                sb.AppendLine($"Came to Power via: {(_becameRulerThroughCoup ? "Coup" : "Succession")}");
+                sb.AppendLine($"Victories This Week: {_victoriesThisWeek}");
+                sb.AppendLine($"Defeats This Week: {_defeatsThisWeek}");
+                if (_holdingFeast) sb.AppendLine("Currently Hosting Feast: Yes");
+                if (_denariDonatedThisWeek > 0) sb.AppendLine($"Donations This Week: {_denariDonatedThisWeek:N0} denars");
+                sb.AppendLine();
+            }
+
+            // === ACTIVE PLOTS ===
+            if (_activePlots.Any())
+            {
+                sb.AppendLine("─── ACTIVE PLOTS ───");
+                foreach (var plot in _activePlots.Where(p => p.Phase != PlotPhase.Completed))
+                {
+                    sb.AppendLine($"• Target: {(plot.Target != null ? plot.Target.Name.ToString() : "Unknown")}");
+                    sb.AppendLine($"  Method: {plot.Method}, Phase: {plot.Phase}");
+                }
+                sb.AppendLine();
+            }
+
+            // === RIVAL INFO ===
+            if (kingdom != null && !_isRuler)
+            {
+                var rival = IdentifyGreatestRival(kingdom);
+                if (rival != null)
+                {
+                    var rivalData = GetClanData(rival.Clan);
+                    sb.AppendLine("─── GREATEST RIVAL ───");
+                    sb.AppendLine($"Name: {rival.Name}");
+                    sb.AppendLine($"Clan: {rival.Clan?.Name}");
+                    sb.AppendLine($"Rivalry Score: {rivalData.RivalryScore:F0}");
+                    int rivalRelation = ruler != null ? rival.GetRelation(ruler) : 0;
+                    sb.AppendLine($"Their Relation with Ruler: {rivalRelation}");
+                }
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("═══════════════════════════════════════");
+            sb.AppendLine("Press 'Ctrl+I' anytime on the map to view this panel.");
+
+            // Show as an inquiry popup
+            InformationManager.ShowInquiry(
+                new InquiryData(
+                    "Intrigue Status",
+                    sb.ToString(),
+                    true,
+                    false,
+                    "Close",
+                    null,
+                    null,
+                    null),
+                true);
+        }
+
+        private Hero IdentifyGreatestRival(Kingdom kingdom)
+        {
+            if (kingdom == null) return null;
+
+            Hero greatestRival = null;
+            float highestRivalry = 0f;
+
+            foreach (var clan in kingdom.Clans)
+            {
+                if (clan == Clan.PlayerClan || clan.Leader == null) continue;
+                if (clan.Leader == kingdom.Leader) continue; // Ruler is target, not rival
+
+                var data = GetClanData(clan);
+                if (data.RivalryScore > highestRivalry)
+                {
+                    highestRivalry = data.RivalryScore;
+                    greatestRival = clan.Leader;
+                }
+            }
+
+            return greatestRival;
         }
 
         #endregion
@@ -1345,6 +1630,110 @@ namespace TheMacedonian.Behaviors
 
         private void AddDialogs(CampaignGameStarter starter)
         {
+            // ========== RIGHT HAND DIALOGS (with Ruler) ==========
+            
+            // Player initiates Right Hand petition with the ruler
+            starter.AddPlayerLine(
+                "macedonian_righthand_petition_start",
+                "lord_talk_speak_diplomacy_2",
+                "macedonian_righthand_ruler_response",
+                "{=MACED_RH_PETITION}My liege, I wish to serve you more closely. I would be honored to be your Royal Protector.",
+                () => CanPetitionForRightHand(),
+                null,
+                110); // Higher priority than conspiracy
+
+            // Ruler accepts (if requirements met)
+            starter.AddDialogLine(
+                "macedonian_righthand_ruler_accept",
+                "macedonian_righthand_ruler_response",
+                "macedonian_righthand_accept_confirm",
+                "{=MACED_RH_ACCEPT}Your loyalty in battle has not gone unnoticed. I would welcome you as my Right Hand... but first, I require a token of your commitment.",
+                () => CanBecomeRightHand(),
+                null);
+
+            // Ruler rejects (requirements not met)
+            starter.AddDialogLine(
+                "macedonian_righthand_ruler_reject_battles",
+                "macedonian_righthand_ruler_response",
+                "lord_pretalk",
+                "{=MACED_RH_REJECT_BATTLES}You have not yet proven yourself in battle by my side. Fight alongside me more, and we shall speak again. ({BATTLES_CURRENT}/{BATTLES_REQUIRED} battles)",
+                () => !HasEnoughBattlesWithRuler(),
+                () => SetBattleCountVariables());
+
+            // Ruler rejects (relation too low)
+            starter.AddDialogLine(
+                "macedonian_righthand_ruler_reject_relation",
+                "macedonian_righthand_ruler_response",
+                "lord_pretalk",
+                "{=MACED_RH_REJECT_RELATION}I do not yet trust you enough for such a position. Improve our relations first.",
+                () => HasEnoughBattlesWithRuler() && !HasEnoughRelationWithRuler(),
+                null);
+
+            // Player confirms acceptance (send companion as hostage)
+            starter.AddPlayerLine(
+                "macedonian_righthand_accept_yes",
+                "macedonian_righthand_accept_confirm",
+                "macedonian_righthand_hostage_demand",
+                "{=MACED_RH_ACCEPT_YES}I am honored, my liege. What token do you require?",
+                null,
+                null);
+
+            // Player declines
+            starter.AddPlayerLine(
+                "macedonian_righthand_accept_no",
+                "macedonian_righthand_accept_confirm",
+                "lord_pretalk",
+                "{=MACED_RH_ACCEPT_NO}Perhaps another time, my liege.",
+                null,
+                null);
+
+            // Ruler demands hostage
+            starter.AddDialogLine(
+                "macedonian_righthand_hostage_demand",
+                "macedonian_righthand_hostage_demand",
+                "macedonian_righthand_hostage_response",
+                "{=MACED_RH_HOSTAGE}Send one of your trusted companions to serve at my court for a time. This will cement our bond of trust.",
+                null,
+                null);
+
+            // Player agrees to hostage
+            starter.AddPlayerLine(
+                "macedonian_righthand_hostage_yes",
+                "macedonian_righthand_hostage_response",
+                "macedonian_righthand_complete",
+                "{=MACED_RH_HOSTAGE_YES}It shall be done, my liege. I will send someone worthy.",
+                () => HasCompanionToSend(),
+                () => OnBecomeRightHand());
+
+            // Player has no companion
+            starter.AddPlayerLine(
+                "macedonian_righthand_hostage_none",
+                "macedonian_righthand_hostage_response",
+                "lord_pretalk",
+                "{=MACED_RH_HOSTAGE_NONE}I... have no companions to send at this time.",
+                () => !HasCompanionToSend(),
+                null);
+
+            // Player refuses hostage
+            starter.AddPlayerLine(
+                "macedonian_righthand_hostage_no",
+                "macedonian_righthand_hostage_response",
+                "lord_pretalk",
+                "{=MACED_RH_HOSTAGE_NO}I cannot agree to such terms.",
+                null,
+                null);
+
+            // Completion
+            starter.AddDialogLine(
+                "macedonian_righthand_complete",
+                "macedonian_righthand_complete",
+                "lord_pretalk",
+                "{=MACED_RH_COMPLETE}Excellent. From this day, you are my Right Hand. Serve me well, and greater rewards shall follow.",
+                null,
+                null);
+
+            // ========== CONSPIRACY DIALOGS (with Lords) ==========
+            
             // Conspiracy recruitment dialog
             starter.AddDialogLine(
                 "macedonian_conspiracy_start",
@@ -1410,6 +1799,100 @@ namespace TheMacedonian.Behaviors
                 _suspicion.RulerSuspicion += 5f;
             }
         }
+
+        #region Right Hand Helper Methods
+
+        private const int RequiredBattlesWithRuler = 3;
+
+        private bool CanPetitionForRightHand()
+        {
+            // Can only petition the ruler
+            var hero = Hero.OneToOneConversationHero;
+            if (hero == null) return false;
+
+            var kingdom = Clan.PlayerClan?.Kingdom;
+            if (kingdom == null) return false;
+            if (hero != kingdom.Leader) return false;
+
+            // Already Right Hand?
+            if (_isRightHand) return false;
+
+            // Basic tier requirement
+            return Clan.PlayerClan.Tier >= 3;
+        }
+
+        private bool CanBecomeRightHand()
+        {
+            return HasEnoughBattlesWithRuler() && HasEnoughRelationWithRuler();
+        }
+
+        private bool HasEnoughBattlesWithRuler()
+        {
+            return _battlesFoughtWithRuler >= RequiredBattlesWithRuler;
+        }
+
+        private bool HasEnoughRelationWithRuler()
+        {
+            var kingdom = Clan.PlayerClan?.Kingdom;
+            if (kingdom?.Leader == null) return false;
+
+            int relation = Hero.MainHero.GetRelation(kingdom.Leader);
+            return relation >= 30;
+        }
+
+        private void SetBattleCountVariables()
+        {
+            MBTextManager.SetTextVariable("BATTLES_CURRENT", _battlesFoughtWithRuler);
+            MBTextManager.SetTextVariable("BATTLES_REQUIRED", RequiredBattlesWithRuler);
+        }
+
+        private bool HasCompanionToSend()
+        {
+            // Check if player has any companions
+            return Clan.PlayerClan?.Companions?.Any() == true;
+        }
+
+        private void OnBecomeRightHand()
+        {
+            _isRightHand = true;
+            _rightHandAppointedDay = (float)CampaignTime.Now.ToDays;
+
+            InformationManager.DisplayMessage(new InformationMessage(
+                "You are now the Royal Protector - the Right Hand of the ruler!",
+                Colors.Green));
+
+            // Grant influence bonus
+            Clan.PlayerClan.AddRenown(50, true);
+            Hero.MainHero.AddSkillXp(DefaultSkills.Charm, 1000);
+
+            // Select and send a companion as hostage
+            var companion = Clan.PlayerClan.Companions?.FirstOrDefault();
+            if (companion != null)
+            {
+                _hostageCompanion = companion;
+                _hostageHeroId = companion.StringId;
+                _hostageStartDate = CampaignTime.Now;
+                InformationManager.DisplayMessage(new InformationMessage(
+                    $"{companion.Name} has been sent to serve at the ruler's court.",
+                    Colors.Cyan));
+            }
+        }
+
+        /// <summary>
+        /// Called from battle events to track fights alongside ruler
+        /// </summary>
+        public void OnBattleWithRuler()
+        {
+            _battlesFoughtWithRuler++;
+            if (_battlesFoughtWithRuler == RequiredBattlesWithRuler)
+            {
+                InformationManager.DisplayMessage(new InformationMessage(
+                    "You have proven yourself in battle alongside your liege. You may now petition to become the Royal Protector.",
+                    Colors.Green));
+            }
+        }
+
+        #endregion
 
         private bool CanStartConspiracyDialog()
         {

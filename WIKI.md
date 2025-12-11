@@ -8,15 +8,16 @@
 
 1. [Overview](#overview)
 2. [Getting Started](#getting-started)
-3. [The Intrigue Menu](#the-intrigue-menu)
-4. [Assassination System](#assassination-system)
-5. [Conspiracy System](#conspiracy-system)
-6. [Suspicion Mechanics](#suspicion-mechanics)
-7. [Rivalry System](#rivalry-system)
-8. [Post-Coronation: Ruling as Basil](#post-coronation-ruling-as-basil)
-9. [Calculations & Formulas](#calculations--formulas)
-10. [Tips & Strategies](#tips--strategies)
-11. [Configuration Options](#configuration-options)
+3. [The Right Hand System](#the-right-hand-system)
+4. [The Intrigue Menu](#the-intrigue-menu)
+5. [Assassination System](#assassination-system)
+6. [Conspiracy System](#conspiracy-system)
+7. [Suspicion Mechanics](#suspicion-mechanics)
+8. [Rivalry System](#rivalry-system)
+9. [Post-Coronation: Ruling as Basil](#post-coronation-ruling-as-basil)
+10. [Calculations & Formulas](#calculations--formulas)
+11. [Tips & Strategies](#tips--strategies)
+12. [Configuration Options](#configuration-options)
 
 ---
 
@@ -46,6 +47,77 @@ In any **town** or **castle** you own or can enter, look for the option:
 > **"Pursue dark intrigues..."**
 
 This opens the main intrigue menu where all plotting takes place.
+
+---
+
+## The Right Hand System
+
+### Overview
+
+Before you can plot against the ruler, you must first earn their trust. The **Right Hand** (Royal Protector) position is your gateway to power - it places you at the ruler's side where you can observe weaknesses, build alliances, and strike when the time is right.
+
+### Requirements to Become Right Hand
+
+| Requirement | Details |
+|-------------|---------|
+| **Clan Tier** | 3 or higher |
+| **Battles with Ruler** | 3 victorious field battles fighting alongside the ruler |
+| **Relation with Ruler** | 30+ |
+| **Companion Available** | At least 1 companion to send as hostage |
+
+### How to Become Right Hand
+
+#### Step 1: Join Your Ruler's Army
+- Find your kingdom's ruler on the campaign map
+- Join their army (if they have one) or travel near them when battles occur
+- You must be on the **same side** in battle
+
+#### Step 2: Fight 3 Victorious Battles Together
+- Only **field battles** count (not sieges or raids)
+- You must **win** the battle
+- Progress is tracked automatically
+- You'll see a notification: *"You have proven yourself in battle alongside your liege..."*
+
+#### Step 3: Build Relation
+- Gift gold or prisoners to the ruler
+- Complete quests for them
+- Support their policies in the kingdom
+- Target: **30+ relation**
+
+#### Step 4: Petition the Ruler
+- Find the ruler in a settlement
+- In conversation, select: **"My liege, I wish to serve you more closely. I would be honored to be your Royal Protector."**
+- If you meet requirements, they'll accept and ask for a hostage
+
+#### Step 5: Send a Companion
+- The ruler will ask you to send a companion to serve at court
+- Your first available companion is automatically selected
+- This companion becomes a "hostage" ensuring your loyalty
+
+### Benefits of Right Hand Status
+
+| Benefit | Effect |
+|---------|--------|
+| **Renown** | +50 renown immediately |
+| **Charm XP** | +1000 Charm skill experience |
+| **Intrigue Access** | Unlocks full assassination plotting |
+| **Court Position** | Narrative weight in political matters |
+
+### Rejection Reasons
+
+If the ruler rejects your petition:
+
+- **"Not enough battles"** - Fight more victorious battles alongside them (current/required shown)
+- **"Not enough trust"** - Improve your relation with the ruler to 30+
+- **No companion** - You need at least one companion to send as hostage
+
+### Companion Hostage
+
+Your hostage companion:
+- Remains "at court" narratively
+- Is still technically in your clan
+- Creates a bond of trust with the ruler
+- May be at risk if you're exposed as a traitor later
 
 ---
 

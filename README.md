@@ -16,9 +16,11 @@ In 9th century Byzantium, Basil I rose from nothing to become Emperor through a 
 ## Features
 
 ### The Right Hand System
-- Fight alongside your ruler in battle to earn trust
-- Send a companion as "hostage" to prove loyalty
-- Gain access to court secrets and assassination opportunities
+- **Battle Tracking** - Fight 3+ victorious battles alongside your ruler
+- **Petition Dialog** - Request to become Royal Protector when requirements are met
+- **Companion Hostage** - Send a trusted companion to serve at the ruler's court
+- **Requirements** - Clan Tier 3+, Relation 30+, companion available
+- **Benefits** - Renown, Charm XP, access to intrigue options
 
 ### Conspiracy System
 - Recruit disaffected lords to your cause
@@ -55,7 +57,7 @@ Four distinct approaches, each with unique mechanics:
 
 ## Requirements
 
-- Mount & Blade II: Bannerlord (v1.2.x+)
+- Mount & Blade II: Bannerlord v1.3.9+
 - [Mod Configuration Menu v5](https://www.nexusmods.com/mountandblade2bannerlord/mods/612) (optional but recommended)
 
 ## Configuration
@@ -68,23 +70,24 @@ With MCM installed, access settings via the mod options menu:
 
 ## Current Status
 
-**Version 0.1.0** - Foundation Release
+**Version 0.3.0** - Right Hand Release
 
-This release establishes the core framework including:
-- ✅ Full data model implementation
-- ✅ Probability calculation engine
-- ✅ Save/load support
-- ✅ MCM settings integration
-- ✅ Basic conspiracy recruitment dialogs
-- ✅ Suspicion and legitimacy systems
+This release adds the complete Right Hand (Royal Protector) system:
+- ✅ Right Hand petition dialogs with ruler
+- ✅ Battle tracking when fighting alongside ruler
+- ✅ Companion hostage mechanics
+- ✅ Full assassination execution system
+- ✅ Conspiracy recruitment dialogs
+- ✅ Post-coronation legitimacy management
+- ✅ Game v1.3.9 compatibility
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ### In Development
-- Assassination execution menus
-- Full dialog trees
 - Intrigue status UI panel
-- Post-coronation events
+- Multiple hostage companion selection
+- Right Hand benefits & abilities
+- Enhanced coup execution
 
 ## Design Philosophy
 

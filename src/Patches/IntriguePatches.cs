@@ -107,10 +107,11 @@ namespace TheMacedonian.Patches
 
         /// <summary>
         /// Track significant relation changes that might affect conspiracy status.
+        /// Parameter names updated for Bannerlord 1.3.9 API
         /// </summary>
         [HarmonyPatch(typeof(ChangeRelationAction), nameof(ChangeRelationAction.ApplyRelationChangeBetweenHeroes))]
         [HarmonyPostfix]
-        public static void ApplyRelationChange_Postfix(Hero hero1, Hero hero2, int relationChange, bool showQuickNotification)
+        public static void ApplyRelationChange_Postfix(Hero hero, Hero gainedRelationWith, int relationChange, bool showQuickNotification)
         {
             try
             {
@@ -118,7 +119,7 @@ namespace TheMacedonian.Patches
                     return;
 
                 // Only care about significant changes involving the player
-                if (hero1 != Hero.MainHero && hero2 != Hero.MainHero)
+                if (hero != Hero.MainHero && gainedRelationWith != Hero.MainHero)
                     return;
 
                 if (Math.Abs(relationChange) < 10)
@@ -128,7 +129,7 @@ namespace TheMacedonian.Patches
                 if (behavior == null)
                     return;
 
-                var otherHero = hero1 == Hero.MainHero ? hero2 : hero1;
+                var otherHero = hero == Hero.MainHero ? gainedRelationWith : hero;
 
                 // If relation drops significantly with a conspirator, they might leave
                 if (relationChange < -20 && otherHero.Clan != null)
@@ -155,111 +156,18 @@ namespace TheMacedonian.Patches
 
         #endregion
 
-        #region Battle Participation Patches
+        #region Battle Participation
 
-        /// <summary>
-        /// Track battles fought alongside the ruler for Right Hand progression.
-        /// </summary>
-        [HarmonyPatch(typeof(MapEventSide), "OnFinish")]
-        [HarmonyPostfix]
-        public static void MapEventSide_OnFinish_Postfix(MapEventSide __instance)
-        {
-            try
-            {
-                if (!MCMSettings.Instance?.EnableRightHandSystem ?? true)
-                    return;
-
-                var behavior = Campaign.Current?.GetCampaignBehavior<MacedonianBehavior>();
-                if (behavior == null)
-                    return;
-
-                // Check if player participated
-                bool playerParticipated = false;
-                Hero ruler = Clan.PlayerClan?.Kingdom?.Leader;
-
-                if (ruler == null || ruler == Hero.MainHero)
-                    return; // Already ruler or not in kingdom
-
-                foreach (var party in __instance.Parties)
-                {
-                    if (party.Party?.LeaderHero == Hero.MainHero)
-                    {
-                        playerParticipated = true;
-                        break;
-                    }
-                }
-
-                if (!playerParticipated)
-                    return;
-
-                // Check if ruler participated on same side
-                bool rulerParticipated = false;
-                foreach (var party in __instance.Parties)
-                {
-                    if (party.Party?.LeaderHero == ruler)
-                    {
-                        rulerParticipated = true;
-                        break;
-                    }
-                }
-
-                if (rulerParticipated)
-                {
-                    behavior.OnBattleFoughtWithRuler();
-                }
-            }
-            catch (Exception ex)
-            {
-                if (MCMSettings.Instance?.EnableDebugLogging ?? false)
-                {
-                    InformationManager.DisplayMessage(new InformationMessage(
-                        $"[TheMacedonian] Battle patch error: {ex.Message}",
-                        Colors.Red));
-                }
-            }
-        }
+        // NOTE: Battle participation tracking is now handled via CampaignEvents in MacedonianBehavior
+        // The MapEventSide.OnFinish method doesn't exist in the current API
+        // Instead, we register for MapEventEnded event in the behavior
 
         #endregion
 
-        #region Companion/Prisoner Patches
+        #region Companion/Prisoner Tracking
 
-        /// <summary>
-        /// Track when companions are given as hostages.
-        /// </summary>
-        [HarmonyPatch(typeof(TakePrisonerAction), nameof(TakePrisonerAction.Apply))]
-        [HarmonyPostfix]
-        public static void TakePrisoner_Postfix(PartyBase capturerParty, Hero prisonerHero)
-        {
-            try
-            {
-                if (!MCMSettings.Instance?.EnableRightHandSystem ?? true)
-                    return;
-
-                // Check if this is the player's companion being held by the ruler
-                if (prisonerHero == null || prisonerHero.Clan != Clan.PlayerClan)
-                    return;
-
-                if (!prisonerHero.IsPlayerCompanion)
-                    return;
-
-                var kingdom = Clan.PlayerClan?.Kingdom;
-                var ruler = kingdom?.Leader;
-
-                if (ruler == null)
-                    return;
-
-                // Check if captured by ruler's party
-                if (capturerParty?.LeaderHero == ruler)
-                {
-                    var behavior = Campaign.Current?.GetCampaignBehavior<MacedonianBehavior>();
-                    behavior?.OnCompanionBecameHostage(prisonerHero);
-                }
-            }
-            catch (Exception)
-            {
-                // Non-critical, fail silently
-            }
-        }
+        // NOTE: Hostage/prisoner tracking is handled via CampaignEvents.HeroPrisonerTaken
+        // in MacedonianBehavior rather than patching TakePrisonerAction which may vary by version
 
         #endregion
     }
